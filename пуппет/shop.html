@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<title>Товары и корзина</title>
+<style>
+  body { font-family: Arial, sans-serif; }
+  .product { border: 1px solid #ccc; padding: 10px; margin: 10px; display: inline-block; width: 200px; vertical-align: top; }
+</style>
+</head>
+<body>
+
+<h1>Каталог кукол</h1>
+<div id="products-container"></div>
+
+<h2>Ваша корзина</h2>
+<div id="cart-container"></div>
+
+<button id="logout-btn">Выйти из аккаунта</button>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/supabase.min.js"></script>
+<script>
+const supabaseUrl = 'https://vvrloeopwbnnzkxzhzdl.supabase.co'; // вставьте свои
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2cmxvZW9wd2JubnpreHpoemRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyNTQwMzMsImV4cCI6MjA3OTgzMDAzM30.CTDZQUzDgs014--4aWgpA1VuxV-f3HObFP6cS9PSldM'; // вставьте свои
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+let currentUser = null;
+
+// Проверка авторизации
+supabase.auth.onAuthStateChange(async (event, session) => {
+  if(session && session.user){
+    currentUser = session.user;
+    loadProducts();
+    loadCart();
+  } else {
+    // перенаправим назад на главную
+    window.location.href = 'index.html';
+  }
+});
+
+// Выйти
+document.getElementById('logout-btn').onclick = () => {
+  supabase.auth.signOut();
+  window.location.href='index.html';
+}
+
+async function loadProducts() {
+  const { data, error } = await supabase.from('products').select('*');
+  const container = document.getElementById('products-container');
+  container.innerHTML = '';
+  data.forEach(prod => {
+    const div = document.createElement('div');
+    div.className='product';
+    div.innerHTML = `
+      <img src="${prod.image_url}" width="100%" />
+      <h3>${prod.name}</h3>
+      <p>${prod.description}</p>
+      <p>Цена: ${prod.price} руб.</p>
+      <button onclick="addToCart(${prod.id})">Добавить в корзину</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+async function loadCart() {
+  const {data} = await supabase
+    .from('cart')
+    .select('id, quantity, product!inner(id, name, price)')
+    .eq('user_id', currentUser.id);
+  const container = document.getElementById('cart-container');
+  container.innerHTML = '';
+  if(data.length===0){
+    container.innerHTML='Корзина пуста.';
+    return;
+  }
+  data.forEach(item => {
+    const div = document.createElement('div');
+    div.innerHTML = `
+      ${item.product.name} - ${item.quantity} шт.
+      <button onclick="removeFromCart(${item.id})">Удалить</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+async function addToCart(productId) {
+  // проверить есть ли уже
+  const {data:existing} = await supabase
+    .from('cart')
+    .select('id, quantity')
+    .eq('user_id', currentUser.id)
+    .eq('product_id', productId)
+    .single();
+  if(existing){
+    await supabase
+      .from('cart')
+      .update({quantity: existing.quantity + 1})
+      .eq('id', existing.id);
+  } else {
+    await supabase
+      .from('cart')
+      .insert({user_id: currentUser.id, product_id: productId, quantity:1});
+  }
+  loadCart();
+}
+
+async function removeFromCart(cartId) {
+  await supabase
+    .from('cart')
+    .delete()
+    .eq('id', cartId);
+  loadCart();
+}
+</script>
+</body>
+</html>

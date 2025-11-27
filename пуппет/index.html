@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<title>Магазин кукол</title>
+<style>
+  body { font-family: Arial, sans-serif; }
+  .auth-form { margin-bottom: 20px; }
+  button { margin-top: 5px; }
+</style>
+</head>
+<body>
+
+<h1>Добро пожаловать в магазин кукол!</h1>
+
+<div class="auth-form" id="auth-section">
+  <h2>Регистрация</h2>
+  <input type="email" id="reg-email" placeholder="Email" />
+  <input type="text" id="reg-username" placeholder="Никнейм" />
+  <button id="register-btn">Зарегистрироваться</button>
+
+  <h2>Вход</h2>
+  <input type="email" id="login-email" placeholder="Email" />
+  <button id="login-btn">Войти</button>
+</div>
+
+<div id="user-info" style="display:none;">
+  <p>Вы вошли как <span id="user-email"></span> (<span id="user-nick"></span>)</p>
+  <button id="logout-btn">Выйти</button>
+  <br/><br/>
+  <a href="shop.html">Перейти к товарам</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/supabase.min.js"></script>
+<script>
+const supabaseUrl = 'https://vvrloeopwbnnzkxzhzdl.supabase.co'; // вставьте свой
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2cmxvZW9wd2JubnpreHpoemRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyNTQwMzMsImV4cCI6MjA3OTgzMDAzM30.CTDZQUzDgs014--4aWgpA1VuxV-f3HObFP6cS9PSldM'; // вставьте свой
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+const registerBtn = document.getElementById('register-btn');
+const loginBtn = document.getElementById('login-btn');
+const logoutBtn = document.getElementById('logout-btn');
+
+const authSection = document.getElementById('auth-section');
+const userInfo = document.getElementById('user-info');
+const userEmailSpan = document.getElementById('user-email');
+const userNickSpan = document.getElementById('user-nick');
+
+let currentUser = null;
+
+// Проверить вход
+supabase.auth.onAuthStateChange((event, session) => {
+  if(session && session.user){
+    currentUser = session.user;
+    document.getElementById('user-email').textContent = currentUser.email;
+    // Получить никнейм из таблицы users
+    fetchUserData();
+    authSection.style.display='none';
+    userInfo.style.display='block';
+  }else{
+    currentUser = null;
+    authSection.style.display='block';
+    userInfo.style.display='none';
+  }
+});
+
+async function fetchUserData() {
+  const {data,error} = await supabase
+    .from('users')
+    .select('username')
+    .eq('id', currentUser.id)
+    .single();
+  if(data){
+    userNickSpan.textContent = data.username;
+  }else{
+    userNickSpan.textContent = '';
+  }
+}
+
+// Регистрация
+document.getElementById('register-btn').onclick = async () => {
+  const email = document.getElementById('reg-email').value;
+  const username = document.getElementById('reg-username').value;
+  const {user, error} = await supabase.auth.signUp({email});
+  if(error){
+    alert('Ошибка регистрации: ' + error.message);
+    return;
+  }
+  // После регистрации добавляем никнейм в таблицу users
+  await supabase.from('users').insert({id: user.id, username, email});
+}
+
+// Войти
+document.getElementById('login-btn').onclick = async () => {
+  const email = document.getElementById('login-email').value;
+  const {user, error} = await supabase.auth.signIn({email});
+  if(error){
+    alert('Ошибка входа: ' + error.message);
+  }
+}
+
+// Выхо
+document.getElementById('logout-btn').onclick = async () => {
+  await supabase.auth.signOut();
+}
+
+</script>
+</body>
+</html>
